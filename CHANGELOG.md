@@ -4,6 +4,14 @@ What changed in each version of Tasks. Versions follow [semantic versioning](htt
 
 To update an install, run `tasks update`. Your tasks are kept. (Installs from before 1.3.0 don't have that command yet: in the downloaded folder, run `git pull` and then `sudo ./install.sh` once.)
 
+## [1.4.0] - 2026-10-13
+
+### Added
+- **Pull to refresh** in the home-screen app on iPhone: pull down at the top of the board and let go to reload. (In a normal browser tab, the browser's own pull-to-refresh is used.)
+
+### Fixed
+- Phones and iPads no longer zoom in when you tap a text box, such as when adding a category. Text boxes are now 16px on touch screens.
+
 ## [1.3.0] - 2026-10-13
 
 ### Added
@@ -37,6 +45,7 @@ To update an install, run `tasks update`. Your tasks are kept. (Installs from be
 
 First release.
 
+[1.4.0]: https://github.com/pearljamfever/tasks/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/pearljamfever/tasks/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/pearljamfever/tasks/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pearljamfever/tasks/compare/v1.0...v1.1.0

@@ -19,6 +19,7 @@ const ICONS = {
   bell: svg('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>', 15),
   hourglass: svg('<path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2"/>', 13),
   send: svg('<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>', 15),
+  refresh: svg('<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>', 18),
 };
 const icon = (name) => { const s = document.createElement('span'); s.className = 'ico'; s.innerHTML = ICONS[name]; return s; };
 document.querySelectorAll('[data-icon]').forEach((el) => { el.innerHTML = ICONS[el.dataset.icon]; el.classList.add('ico'); });
@@ -819,3 +820,50 @@ async function loadAll() {
 loadAll();
 // Pick up changes made in another tab or on another device when this tab comes back into view.
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && !busy) loadAll().catch(() => {}); });
+
+// ---------- pull to refresh ----------
+// Opened from the home screen, iPhone apps have no browser pull-to-refresh, so the board
+// provides its own there. In a normal browser tab the browser's own one is left alone.
+(function pullToRefresh() {
+  const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  if (!standalone) return;
+  const THRESHOLD = 70, MAX = 110;
+  const spinner = icon('refresh');
+  const ind = h('div', { class: 'ptr', 'aria-hidden': 'true' }, spinner);
+  document.body.append(ind);
+  let startY = null, pull = 0;
+  const busyElsewhere = () => openCat || document.querySelector('.modal.show');
+  const show = (d, animate) => {
+    ind.style.transition = animate ? 'transform .25s ease, opacity .25s ease' : 'none';
+    ind.style.transform = `translate(-50%, ${d - 48}px)`;
+    ind.style.opacity = Math.min(1, d / THRESHOLD);
+    spinner.style.transform = `rotate(${d * 3}deg)`;
+    ind.classList.toggle('ready', d >= THRESHOLD);
+  };
+  document.addEventListener('touchstart', (e) => {
+    pull = 0;
+    startY = window.scrollY <= 0 && e.touches.length === 1 && !busyElsewhere() ? e.touches[0].clientY : null;
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (startY === null) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0 || window.scrollY > 0) { if (pull) show(0); pull = 0; return; }
+    e.preventDefault(); // keep iOS from rubber-banding the whole page while pulling
+    pull = Math.min(MAX, dy * 0.5);
+    show(pull);
+  }, { passive: false });
+  const release = () => {
+    if (startY === null) return;
+    startY = null;
+    if (pull >= THRESHOLD) {
+      show(THRESHOLD, true);
+      ind.classList.add('spinning');
+      location.reload();
+    } else {
+      show(0, true);
+    }
+    pull = 0;
+  };
+  document.addEventListener('touchend', release);
+  document.addEventListener('touchcancel', release);
+})();
