@@ -57,6 +57,7 @@ Just want to try it? If you have Node.js, `npm start` runs it on port 3100 from 
 
 - **[Installing and running](INSTALL.md):** settings, upgrading, backups and restoring, uninstalling, security, troubleshooting
 - **[Using Tasks](docs/USAGE.md):** tasks, note commands, the Feed, categories
+- **[Changelog](CHANGELOG.md):** what changed in each version
 
 ## License
 
