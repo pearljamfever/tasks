@@ -1,4 +1,4 @@
-// Card Tasks - a tiny task manager. No dependencies; data lives in DATA_DIR/data.json.
+// Tasks - a tiny task manager. No dependencies; data lives in DATA_DIR/data.json.
 const http = require('http');
 const fs = require('fs');
 const os = require('os');
@@ -403,7 +403,7 @@ server.on('error', (e) => {
   log(e.code === 'EADDRINUSE' ? `ERROR: port ${PORT} is already in use by another program. Set PORT to a free port.` : `ERROR: ${e.message}`);
   process.exit(1);
 });
-server.listen(PORT, HOST, () => log(`Card Tasks listening on http://${HOST}:${PORT} (data: ${DATA_DIR})`));
+server.listen(PORT, HOST, () => log(`Tasks listening on http://${HOST}:${PORT} (data: ${DATA_DIR})`));
 
 // Saves are synchronous, so by the time a signal is handled no write is half-done.
 for (const sig of ['SIGTERM', 'SIGINT']) {

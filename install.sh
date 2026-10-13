@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
-# Installs or upgrades Card Tasks as a systemd service.
+# Installs or upgrades Tasks as a systemd service.
 #
 #   sudo ./install.sh                 # install, or upgrade an existing install (data is kept)
 #   sudo ./install.sh --port 8080     # choose the port (default 3100)
 #
-# Code goes to /opt/card-tasks, data to /var/lib/card-tasks, settings to /etc/card-tasks.env.
+# Code goes to /opt/tasks, data to /var/lib/tasks, settings to /etc/tasks.env.
 set -euo pipefail
 
-APP_DIR=/opt/card-tasks
-ENV_FILE=/etc/card-tasks.env
-UNIT_FILE=/etc/systemd/system/card-tasks.service
-SERVICE_USER=card-tasks
+APP_DIR=/opt/tasks
+ENV_FILE=/etc/tasks.env
+UNIT_FILE=/etc/systemd/system/tasks.service
+SERVICE_USER=tasks
+DATA_DIR=/var/lib/tasks
+# "tasks" is a common name, so everything this script creates is marked, and it refuses to
+# take over a user, folder, settings file or service of that name that something else made.
+USER_COMMENT="Tasks app service user"
+APP_MARK=.installed-by-tasks-app
+FILE_MARK="Tasks app"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT=""
 
@@ -43,10 +49,24 @@ case "$NODE" in
   /root/*|/home/*) die "node is installed under a home folder ($NODE), which the sandboxed service can't read. Install Node.js system-wide (e.g. from your package manager or NodeSource) and re-run." ;;
 esac
 
+# ---------- don't take over anything that isn't ours ----------
+if id "$SERVICE_USER" >/dev/null 2>&1; then
+  [ "$(getent passwd "$SERVICE_USER" | cut -d: -f5)" = "$USER_COMMENT" ] \
+    || die "a user named '$SERVICE_USER' already exists and wasn't created by this installer. Not touching it."
+elif [ -e "$DATA_DIR" ]; then
+  die "$DATA_DIR already exists but wasn't created by this installer. Not touching it."
+fi
+[ ! -e "$APP_DIR" ] || [ -f "$APP_DIR/$APP_MARK" ] \
+  || die "$APP_DIR already exists but wasn't created by this installer. Not touching it."
+[ ! -e "$UNIT_FILE" ] || grep -q "$FILE_MARK" "$UNIT_FILE" \
+  || die "$UNIT_FILE already exists but wasn't created by this installer. Not touching it."
+[ ! -e "$ENV_FILE" ] || grep -q "$FILE_MARK" "$ENV_FILE" \
+  || die "$ENV_FILE already exists but wasn't created by this installer. Not touching it."
+
 # ---------- user ----------
 if ! id "$SERVICE_USER" >/dev/null 2>&1; then
   say "Creating system user $SERVICE_USER"
-  useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$SERVICE_USER"
+  useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin --comment "$USER_COMMENT" "$SERVICE_USER"
 fi
 
 # ---------- code ----------
@@ -57,6 +77,7 @@ rm -rf "$APP_DIR.new"
 mkdir -p "$APP_DIR.new"
 cp -r "$SRC_DIR/server.js" "$SRC_DIR/package.json" "$SRC_DIR/public" "$APP_DIR.new/"
 for f in README.md INSTALL.md LICENSE; do [ -f "$SRC_DIR/$f" ] && cp "$SRC_DIR/$f" "$APP_DIR.new/"; done
+echo "Installed by the Tasks app installer (https://github.com/pearljamfever/tasks)" > "$APP_DIR.new/$APP_MARK"
 chown -R root:root "$APP_DIR.new"
 chmod -R u=rwX,go=rX "$APP_DIR.new"
 rm -rf "$APP_DIR.old"
@@ -68,14 +89,14 @@ rm -rf "$APP_DIR.old"
 if [ ! -f "$ENV_FILE" ]; then
   say "Writing settings to $ENV_FILE"
   cat > "$ENV_FILE" <<EOF
-# Card Tasks settings. Restart after changing: sudo systemctl restart card-tasks
+# Tasks app settings. Restart after changing: sudo systemctl restart tasks
 PORT=${PORT:-3100}
 
 # Extra names the app may be opened as, comma-separated (IP addresses, localhost
 # and this machine's hostname always work). Example: ALLOWED_HOSTS=tasks.home
 ALLOWED_HOSTS=
 
-# How many daily backups to keep in /var/lib/card-tasks/backups
+# How many daily backups to keep in /var/lib/tasks/backups
 KEEP_BACKUPS=30
 EOF
   chmod 644 "$ENV_FILE"
@@ -86,10 +107,10 @@ fi
 
 # ---------- service ----------
 say "Installing systemd service"
-sed "s#@NODE@#$NODE#" "$SRC_DIR/deploy/card-tasks.service" > "$UNIT_FILE"
+sed "s#@NODE@#$NODE#" "$SRC_DIR/deploy/tasks.service" > "$UNIT_FILE"
 systemctl daemon-reload
-systemctl enable card-tasks >/dev/null 2>&1
-systemctl restart card-tasks
+systemctl enable tasks >/dev/null 2>&1
+systemctl restart tasks
 
 # ---------- check ----------
 PORT_NOW="$(sed -n 's/^PORT=\([0-9]*\).*/\1/p' "$ENV_FILE" | tail -1)"
@@ -100,14 +121,14 @@ for _ in $(seq 1 20); do
   if command -v curl >/dev/null; then
     curl -fsS "http://127.0.0.1:$PORT_NOW/healthz" >/dev/null 2>&1 && { healthy=yes; break; }
   else
-    sleep 4; systemctl is-active --quiet card-tasks && healthy=yes; break
+    sleep 4; systemctl is-active --quiet tasks && healthy=yes; break
   fi
   sleep 0.5
 done
 if [ "$healthy" != yes ]; then
-  log="$(journalctl -u card-tasks -n 30 --no-pager 2>/dev/null || true)"
+  log="$(journalctl -u tasks -n 30 --no-pager 2>/dev/null || true)"
   if grep -q -e EADDRINUSE -e "already in use" <<<"$log"; then
-    systemctl stop card-tasks || true
+    systemctl stop tasks || true
     die "port $PORT_NOW is already in use by another program. Pick another: sudo ./install.sh --port 8080"
   fi
   echo "$log" >&2
@@ -116,8 +137,8 @@ fi
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 echo
-say "Card Tasks is running."
+say "Tasks is running."
 echo "    Open:      http://${IP:-localhost}:$PORT_NOW"
 echo "    Settings:  $ENV_FILE"
-echo "    Data:      /var/lib/card-tasks  (daily backups in backups/)"
-echo "    Logs:      journalctl -u card-tasks -e"
+echo "    Data:      $DATA_DIR  (daily backups in backups/)"
+echo "    Logs:      journalctl -u tasks -e"

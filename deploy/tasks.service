@@ -1,28 +1,29 @@
+# Installed by the Tasks app installer.
 [Unit]
-Description=Card Tasks (simple card-style task manager)
+Description=Tasks app (simple card-style task manager)
 Documentation=https://github.com/pearljamfever/tasks
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=card-tasks
-Group=card-tasks
-WorkingDirectory=/opt/card-tasks
+User=tasks
+Group=tasks
+WorkingDirectory=/opt/tasks
 # install.sh replaces @NODE@ with the full path to node.
-ExecStart=@NODE@ /opt/card-tasks/server.js
+ExecStart=@NODE@ /opt/tasks/server.js
 Environment=NODE_ENV=production
 Environment=PORT=3100
-Environment=DATA_DIR=/var/lib/card-tasks
+Environment=DATA_DIR=/var/lib/tasks
 # Your settings (PORT, ALLOWED_HOSTS, KEEP_BACKUPS). This file is kept when you upgrade.
-EnvironmentFile=-/etc/card-tasks.env
-StateDirectory=card-tasks
+EnvironmentFile=-/etc/tasks.env
+StateDirectory=tasks
 StateDirectoryMode=0700
 Restart=always
 RestartSec=2
 TimeoutStopSec=10
 
-# Sandboxing: the app can only write to /var/lib/card-tasks and can't gain privileges.
+# Sandboxing: the app can only write to /var/lib/tasks and can't gain privileges.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

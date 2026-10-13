@@ -1,4 +1,4 @@
-# Using Card Tasks
+# Using Tasks
 
 Tasks are cards. Cards in the same category stack together, and clicking a stack spreads the cards out.
 

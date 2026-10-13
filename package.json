@@ -1,5 +1,5 @@
 {
-  "name": "card-tasks",
+  "name": "tasks",
   "version": "1.0.0",
   "private": true,
   "description": "A simple, self-hosted task manager where tasks are cards, stacked by category.",

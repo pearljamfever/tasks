@@ -53,7 +53,7 @@ function raw(text) {
 }
 
 before(async () => {
-  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'card-tasks-test-'));
+  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tasks-test-'));
   port = await freePort();
   base = `http://127.0.0.1:${port}`;
   await start();

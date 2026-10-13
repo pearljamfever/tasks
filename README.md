@@ -7,11 +7,11 @@
     - LICENSE                  MIT
 -->
 
-# Card Tasks
+# Tasks
 
 A simple, self-hosted task manager for your home network. Tasks are cards, cards in the same category stack together, and progress notes keep track of where each task is.
 
-![Card Tasks](docs/screenshots/board-light.png)
+![Tasks](docs/screenshots/board-light.png)
 
 ## Install
 
@@ -28,7 +28,7 @@ Then open the address it prints. See **[INSTALL.md](INSTALL.md)** for settings, 
 ## Documentation
 
 - [Installing and running](INSTALL.md)
-- [Using Card Tasks](docs/USAGE.md)
+- [Using Tasks](docs/USAGE.md)
 
 ## License
 

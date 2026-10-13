@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Removes the Card Tasks service and app files.
+# Removes the Tasks service and app files.
 #
 #   sudo ./uninstall.sh           # remove the app; keep your data and settings
 #   sudo ./uninstall.sh --purge   # also delete all tasks, backups, settings and the service user
@@ -14,29 +14,42 @@ case "${1:-}" in
 esac
 [ "$(id -u)" -eq 0 ] || { echo "Error: run this as root, e.g. sudo ./uninstall.sh" >&2; exit 1; }
 
+# "tasks" is a common name: only remove things the Tasks installer marked as its own.
+UNIT_FILE=/etc/systemd/system/tasks.service
+if ! { [ -f /opt/tasks/.installed-by-tasks-app ] || grep -qs "Tasks app" "$UNIT_FILE"; }; then
+  echo "Error: no Tasks app install found (nothing in /opt/tasks or $UNIT_FILE was made by its installer). Nothing was removed." >&2
+  exit 1
+fi
+
 if [ "$PURGE" = yes ]; then
-  read -r -p "This permanently deletes all tasks, notes and backups in /var/lib/card-tasks. Type DELETE to confirm: " answer
+  read -r -p "This permanently deletes all tasks, notes and backups in /var/lib/tasks. Type DELETE to confirm: " answer
   [ "$answer" = DELETE ] || { echo "Cancelled; nothing was removed."; exit 1; }
 fi
 
 echo "==> Stopping and removing the service"
-systemctl disable --now card-tasks >/dev/null 2>&1 || true
-rm -f /etc/systemd/system/card-tasks.service
+if grep -qs "Tasks app" "$UNIT_FILE"; then
+  systemctl disable --now tasks >/dev/null 2>&1 || true
+  rm -f "$UNIT_FILE"
+fi
 systemctl daemon-reload
-systemctl reset-failed card-tasks >/dev/null 2>&1 || true
+systemctl reset-failed tasks >/dev/null 2>&1 || true
 
-echo "==> Removing /opt/card-tasks"
-rm -rf /opt/card-tasks
+if [ -f /opt/tasks/.installed-by-tasks-app ]; then
+  echo "==> Removing /opt/tasks"
+  rm -rf /opt/tasks
+fi
 
 if [ "$PURGE" = yes ]; then
   echo "==> Deleting data, settings and the service user"
-  rm -rf /var/lib/card-tasks /var/lib/private/card-tasks /etc/card-tasks.env
-  userdel card-tasks >/dev/null 2>&1 || true
-  echo "Card Tasks has been removed completely."
+  rm -rf /var/lib/tasks /var/lib/private/tasks
+  grep -qs "Tasks app" /etc/tasks.env && rm -f /etc/tasks.env
+  [ "$(getent passwd tasks | cut -d: -f5)" = "Tasks app service user" ] && userdel tasks >/dev/null 2>&1
+  true
+  echo "Tasks has been removed completely."
 else
   echo
-  echo "Card Tasks has been removed. Your data was kept:"
-  echo "    Tasks and backups:  /var/lib/card-tasks"
-  echo "    Settings:           /etc/card-tasks.env"
+  echo "Tasks has been removed. Your data was kept:"
+  echo "    Tasks and backups:  /var/lib/tasks"
+  echo "    Settings:           /etc/tasks.env"
   echo "Reinstalling picks them up again. To delete them too, run: sudo ./uninstall.sh --purge"
 fi
