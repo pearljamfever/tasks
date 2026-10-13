@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tasks</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <h1 class="brand"><span class="logo" data-icon="stack"></span>Tasks</h1>
+  <span class="spacer"></span>
+  <button class="hbtn" id="completedBtn" aria-label="Completed tasks"><span data-icon="checkCircle"></span><span class="label">Completed</span><span class="badge" id="completedCount">0</span></button>
+  <button class="hbtn" id="catsBtn" aria-label="Categories"><span data-icon="tag"></span><span class="label">Categories</span></button>
+  <button class="btn" id="newBtn" aria-label="New task"><span data-icon="plus"></span><span class="label">New task</span></button>
+</header>
+
+<div class="layout">
+  <main id="board"></main>
+  <aside id="feed" aria-label="Feed"></aside>
+</div>
+
+<div id="spread">
+  <div class="spread-head">
+    <h2 id="spreadTitle"></h2>
+    <span class="spacer"></span>
+    <button class="hbtn" id="spreadAdd"><span data-icon="plus"></span><span>Add task</span></button>
+    <button class="hbtn" id="spreadClose"><span data-icon="x"></span><span>Close</span></button>
+  </div>
+  <div class="spread-area" id="spreadArea"></div>
+</div>
+
+<div class="modal" id="completedModal"><div class="panel" id="completedPanel"></div></div>
+<div class="modal" id="catsModal"><div class="panel small" id="catsPanel"></div></div>
+<div class="modal" id="detail"><div class="panel tinted" id="detailPanel"></div></div>
+
+<div class="modal" id="newModal">
+  <div class="panel small">
+    <div class="panel-head">
+      <div class="panel-icon" data-icon="plus"></div>
+      <div><h2>New task</h2></div>
+      <span class="spacer"></span>
+      <button class="icon-btn" data-close aria-label="Close"><span data-icon="x"></span></button>
+    </div>
+    <form id="newForm" class="panel-body" autocomplete="off">
+      <label class="field"><span>Task</span><input class="input" id="newTitle" maxlength="200" placeholder="e.g. Renew the car registration" required></label>
+      <label class="field"><span>Category</span>
+        <div class="cat-select-wrap"><i class="dot"></i><select class="select" id="newCat"></select></div>
+      </label>
+      <div class="new-cat" id="newCatBox"><input class="input" id="newCatName" maxlength="60" placeholder="New category name"></div>
+      <div class="form-actions">
+        <button class="pbtn" type="button" data-close>Cancel</button>
+        <button class="pbtn primary" type="submit">Add task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

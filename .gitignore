@@ -1,0 +1,5 @@
+# Local data when running with `npm start` (contains your tasks)
+data/
+*.tmp
+node_modules/
+.DS_Store
