@@ -15,11 +15,15 @@ Tasks is a single small Node.js server with no dependencies. It's meant to run o
 
 ## Requirements
 
-- Linux with **systemd** (Ubuntu, Debian, Raspberry Pi OS, Fedora, and most others).
-- **Node.js 18 or newer**, installed system-wide. Check with `node --version`.
-  - On Ubuntu/Debian, the [NodeSource packages](https://github.com/nodesource/distributions) give you a current version.
-  - Node installed with `nvm` lives in your home folder, which the sandboxed service can't read. Install it system-wide instead.
-- `git` to download it (or download the ZIP from GitHub).
+- Linux with **systemd** (Ubuntu, Debian, Raspberry Pi OS, Fedora, and most others), on a 64-bit PC (x86-64) or ARM board (arm64 or armv7, e.g. a Raspberry Pi).
+- `git` to download it, or download the ZIP from GitHub's **Code** button.
+
+That's all. **Node.js is taken care of by the installer:**
+- If Node.js 18 or newer is already installed system-wide, the app uses it.
+- If not, the installer downloads the current **Node.js LTS** from nodejs.org, checks it against the published checksum, and puts it in `/opt/tasks/node`. That copy is used only by this app; it doesn't change the system's Node.js or anything else.
+- If the machine has neither `curl` nor `wget` to download with, the installer installs `curl` using the system package manager (apt, dnf, yum, zypper or pacman).
+
+Node.js installed with `nvm` lives in a home folder, which the sandboxed service isn't allowed to read, so the installer uses its own copy instead.
 
 ## Install (Linux with systemd)
 
@@ -35,10 +39,15 @@ To use a different port: `sudo ./install.sh --port 8080`.
 
 The installer:
 
-1. Creates a `tasks` system user to run the app (not root).
-2. Copies the app to `/opt/tasks`.
-3. Writes your settings to `/etc/tasks.env` (only the first time).
-4. Installs and starts the `tasks` systemd service, which starts on boot and restarts itself if it stops.
+1. Sets up Node.js if needed (see [Requirements](#requirements)).
+2. Creates a `tasks` system user to run the app (not root).
+3. Copies the app to `/opt/tasks`.
+4. Writes your settings to `/etc/tasks.env` (only the first time).
+5. Installs and starts the `tasks` systemd service, which starts on boot and restarts itself if it stops.
+
+Two options choose where Node.js comes from:
+- `sudo ./install.sh --bundled-node` always uses the app's own copy from nodejs.org, even if the system has one.
+- `sudo ./install.sh --system-node` always uses the system's Node.js, and removes the app's own copy if there was one.
 
 Your tasks are stored in `/var/lib/tasks`.
 
@@ -69,7 +78,7 @@ git pull
 sudo ./install.sh
 ```
 
-The installer replaces the app files and restarts the service. Your tasks, backups and settings are kept.
+The installer replaces the app files and restarts the service. Your tasks, backups and settings are kept. If the app has its own copy of Node.js, the installer also updates it to the newest LTS release, so re-running it now and then keeps Node.js patched too.
 
 ## Backups and restoring
 
@@ -102,7 +111,7 @@ sudo ./uninstall.sh --purge    # also deletes all tasks, backups, settings and t
 
 ## Running it without the installer
 
-To try it out, or on a system without systemd:
+To try it out, or on a system without systemd (this needs Node.js 18 or newer already installed):
 
 ```sh
 git clone https://github.com/pearljamfever/tasks.git
@@ -139,8 +148,14 @@ If you want to reach it from outside your home, use a VPN such as WireGuard or T
 You opened the app under a name it doesn't know. Add the name to `ALLOWED_HOSTS` in `/etc/tasks.env` and restart.
 
 **The installer says the service didn't start.** The installer prints the log. Common causes:
-- **The port is in use.** You'll see `EADDRINUSE`. Pick another with `sudo ./install.sh --port 8080`.
-- **Node.js is too old or missing.** The installer checks for this and tells you.
+- **The port is in use.** The installer says so; pick another with `sudo ./install.sh --port 8080`.
+- **Something else.** The log above the error usually says what went wrong.
+
+**"Couldn't reach nodejs.org to download Node.js."**
+The machine needs internet access the first time, to download Node.js. Alternatively, install Node.js 18 or newer from your package manager and re-run the installer.
+
+**"nodejs.org has no Node.js build for this CPU."**
+nodejs.org only provides builds for x86-64, arm64 and armv7. On other hardware, install Node.js 18 or newer from your package manager and re-run the installer.
 
 **I can't reach it from another device.**
 Check the machine's firewall allows the port, e.g. `sudo ufw allow 3100/tcp`.

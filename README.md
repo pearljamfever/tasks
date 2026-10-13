@@ -36,7 +36,7 @@ A simple, self-hosted task manager for your home network. Tasks are cards, cards
 
 ## Install
 
-You need a Linux machine with **systemd** (Ubuntu, Debian, Raspberry Pi OS, …) and **Node.js 18 or newer**.
+You need a Linux machine with **systemd** (Ubuntu, Debian, Raspberry Pi OS, …). If it doesn't have Node.js 18 or newer, the installer downloads the current Node.js LTS for the app automatically, without changing the rest of your system.
 
 ```sh
 git clone https://github.com/pearljamfever/tasks.git
@@ -48,7 +48,7 @@ Then open the address it prints, e.g. `http://192.168.1.50:3100`. To use a diffe
 
 The installer runs Tasks as its own locked-down service that starts on boot and keeps daily backups. To update later, run `git pull` then `sudo ./install.sh` again; your tasks are kept.
 
-Just want to try it? `npm start` runs it on port 3100 from the downloaded folder, with no install.
+Just want to try it? If you have Node.js, `npm start` runs it on port 3100 from the downloaded folder, with no install.
 
 > [!IMPORTANT]
 > Tasks has **no login**: anyone who can reach it can see and edit everything. Run it on your home network only, and use a VPN (e.g. WireGuard or Tailscale) to reach it from outside, rather than opening it to the internet.
