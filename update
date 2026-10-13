@@ -93,10 +93,10 @@ fi
 if [ -n "$(g status --porcelain --untracked-files=no)" ] && [ "$FORCE" = no ]; then
   die "files in $SRC_DIR were edited by hand, and updating would overwrite them:
 $(g status --short --untracked-files=no | sed 's/^/    /')
-Save copies of your changes if you need them, then run: ./update --force"
+Save copies of your changes if you need them, then run: tasks update --force (or ./update --force)"
 fi
 if ! g merge --quiet --ff-only "$REMOTE" 2>/dev/null; then
-  [ "$FORCE" = yes ] || die "this folder's history doesn't match GitHub's (it may have been rewritten there). To make the folder match GitHub exactly, run: ./update --force"
+  [ "$FORCE" = yes ] || die "this folder's history doesn't match GitHub's (it may have been rewritten there). To make the folder match GitHub exactly, run: tasks update --force (or ./update --force)"
   say "Making this folder match GitHub"
 fi
 [ "$FORCE" = no ] || g reset --quiet --hard "$REMOTE"
