@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Updates Tasks to the newest version on GitHub.
+#
+#   ./update           # show what's new, then download and install it (or: tasks update)
+#   ./update --check   # only show the installed and newest versions
+#   ./update --force   # update even if files in this folder were edited by hand
+#
+# Your tasks, backups and settings are kept.
+set -euo pipefail
+
+SRC_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+CHECK_ONLY=no
+FORCE=no
+
+die() { echo "Error: $*" >&2; exit 1; }
+say() { echo "==> $*"; }
+
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK_ONLY=yes ;;
+    --force) FORCE=yes ;;
+    -h|--help) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "unknown option: $arg (try --help)" ;;
+  esac
+done
+
+if [ "$(id -u)" -ne 0 ] && [ "$CHECK_ONLY" = no ]; then
+  command -v sudo >/dev/null || die "run this as root"
+  exec sudo "$(readlink -f "$0")" "$@"
+fi
+
+command -v git >/dev/null || die "updating needs git. Install git, or download the newest version from https://github.com/pearljamfever/tasks and run ./install in it."
+[ -d "$SRC_DIR/.git" ] || die "this folder wasn't downloaded with git clone, so it can't update itself. Download the newest version with:
+  git clone https://github.com/pearljamfever/tasks.git && cd tasks && ./install"
+
+# Run git as whoever owns the folder, so root doesn't trip git's "dubious ownership" check
+# or leave root-owned files in someone's home folder.
+OWNER="$(stat -c %U "$SRC_DIR")"
+g() {
+  if [ "$(id -un)" = "$OWNER" ]; then git -C "$SRC_DIR" "$@"; else sudo -u "$OWNER" git -C "$SRC_DIR" "$@"; fi
+}
+version_in() { sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' | head -1; }
+
+INSTALLED="$(version_in < /opt/tasks/package.json 2>/dev/null || true)"
+BRANCH="$(g rev-parse --abbrev-ref HEAD)"
+[ "$BRANCH" != HEAD ] || die "this folder is on a fixed version (detached HEAD), not a branch. Run: git -C \"$SRC_DIR\" checkout main"
+
+say "Checking GitHub for the newest version"
+g fetch --quiet --tags --force origin || die "couldn't reach GitHub. Check the internet connection and try again."
+REMOTE="origin/$BRANCH"
+LATEST="$(g show "$REMOTE:package.json" | version_in)"
+
+echo
+echo "    Installed version:  ${INSTALLED:-not installed}"
+echo "    Newest version:     $LATEST"
+echo
+
+if [ "$(g rev-parse HEAD)" = "$(g rev-parse "$REMOTE")" ] && [ "$INSTALLED" = "$LATEST" ]; then
+  say "You're up to date."
+  exit 0
+fi
+
+# What's new: the changelog sections above the installed version.
+if [ -n "$INSTALLED" ] && [ "$INSTALLED" != "$LATEST" ]; then
+  notes="$(g show "$REMOTE:CHANGELOG.md" 2>/dev/null | awk -v cur="$INSTALLED" '
+    /^## \[/ { v = $2; gsub(/[\[\]]/, "", v); if (v == cur || v ".0" == cur) exit; show = 1 }
+    /^\[[^]]*\]: http/ { exit }
+    show' || true)"
+  if [ -n "$notes" ]; then
+    echo "What's new:"
+    echo
+    echo "$notes" | sed 's/^/    /'
+    echo
+  fi
+fi
+
+[ "$CHECK_ONLY" = yes ] && exit 0
+
+# Bring the folder up to date with GitHub.
+if [ -n "$(g status --porcelain --untracked-files=no)" ] && [ "$FORCE" = no ]; then
+  die "files in $SRC_DIR were edited by hand, and updating would overwrite them:
+$(g status --short --untracked-files=no | sed 's/^/    /')
+Save copies of your changes if you need them, then run: ./update --force"
+fi
+if ! g merge --quiet --ff-only "$REMOTE" 2>/dev/null; then
+  [ "$FORCE" = yes ] || die "this folder's history doesn't match GitHub's (it may have been rewritten there). To make the folder match GitHub exactly, run: ./update --force"
+  say "Making this folder match GitHub"
+fi
+[ "$FORCE" = no ] || g reset --quiet --hard "$REMOTE"
+
+say "Installing ${LATEST}"
+"$SRC_DIR/install"
+echo
+if [ "$INSTALLED" = "$LATEST" ]; then
+  say "Reinstalled $LATEST."
+else
+  say "Updated ${INSTALLED:-nothing} -> $LATEST."
+fi

@@ -17,4 +17,4 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm test
       - name: Check shell scripts
-        run: bash -n install.sh && bash -n uninstall.sh
+        run: bash -n install && bash -n update && bash -n uninstall

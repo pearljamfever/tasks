@@ -41,12 +41,14 @@ You need a Linux machine with **systemd** (Ubuntu, Debian, Raspberry Pi OS, …)
 ```sh
 git clone https://github.com/pearljamfever/tasks.git
 cd tasks
-sudo ./install.sh
+./install
 ```
 
-Then open the address it prints, e.g. `http://192.168.1.50:3100`. To use a different port: `sudo ./install.sh --port 8080`.
+Then open the address it prints, e.g. `http://192.168.1.50:3100`. To use a different port: `./install --port 8080`.
 
-The installer runs Tasks as its own locked-down service that starts on boot and keeps daily backups. To update later, run `git pull` then `sudo ./install.sh` again; your tasks are kept.
+The installer runs Tasks as its own locked-down service that starts on boot and keeps daily backups.
+
+**To update later**, run `tasks update` from any folder. It shows the version you have and the newest one, lists what's new, then installs it. Your tasks are kept.
 
 Just want to try it? If you have Node.js, `npm start` runs it on port 3100 from the downloaded folder, with no install.
 

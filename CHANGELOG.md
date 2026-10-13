@@ -2,7 +2,17 @@
 
 What changed in each version of Tasks. Versions follow [semantic versioning](https://semver.org): bug fixes bump the last number, new features the middle one, and changes that break existing installs the first.
 
-To update an install, run `git pull` then `sudo ./install.sh` in the downloaded folder. Your tasks are kept.
+To update an install, run `tasks update`. Your tasks are kept. (Installs from before 1.3.0 don't have that command yet: in the downloaded folder, run `git pull` and then `sudo ./install.sh` once.)
+
+## [1.3.0] - 2026-10-13
+
+### Added
+- **`tasks update`** updates to the newest version from any folder. It shows the installed and newest versions and what's new, then installs it. `--check` only shows the versions. `./update` in the downloaded folder does the same.
+- **A `tasks` command** for day-to-day use: `tasks version`, `tasks status`, `tasks logs`, `tasks restart` and `tasks uninstall`.
+
+### Changed
+- **Simpler install:** `./install` replaces `sudo ./install.sh`, and asks for your password itself. Likewise `./uninstall` replaces `sudo ./uninstall.sh`.
+- The installer shows which version it installed.
 
 ## [1.2.0] - 2026-10-13
 
@@ -27,6 +37,7 @@ To update an install, run `git pull` then `sudo ./install.sh` in the downloaded 
 
 First release.
 
+[1.3.0]: https://github.com/pearljamfever/tasks/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/pearljamfever/tasks/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pearljamfever/tasks/compare/v1.0...v1.1.0
 [1.0]: https://github.com/pearljamfever/tasks/releases/tag/v1.0

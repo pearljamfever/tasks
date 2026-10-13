@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # Installs or upgrades Tasks as a systemd service.
 #
-#   sudo ./install.sh                 # install, or upgrade an existing install (data is kept)
-#   sudo ./install.sh --port 8080     # choose the port (default 3100)
-#   sudo ./install.sh --bundled-node  # always use the app's own Node.js from nodejs.org
-#   sudo ./install.sh --system-node   # always use the system's Node.js (18 or newer)
+#   ./install                 # install, or reinstall over an existing install (data is kept)
+#   ./install --port 8080     # choose the port (default 3100)
+#   ./install --bundled-node  # always use the app's own Node.js from nodejs.org
+#   ./install --system-node   # always use the system's Node.js (18 or newer)
 #
-# Code goes to /opt/tasks, data to /var/lib/tasks, settings to /etc/tasks.env.
+# Asks for your password (sudo) if not run as root. Code goes to /opt/tasks, data to
+# /var/lib/tasks, settings to /etc/tasks.env, and a `tasks` command to /usr/local/bin.
 # Without a system-wide Node.js 18+, the current Node.js LTS is downloaded into /opt/tasks/node.
 set -euo pipefail
 
 APP_DIR=/opt/tasks
 ENV_FILE=/etc/tasks.env
 UNIT_FILE=/etc/systemd/system/tasks.service
+CLI_FILE=/usr/local/bin/tasks
 SERVICE_USER=tasks
 DATA_DIR=/var/lib/tasks
 # "tasks" is a common name, so everything this script creates is marked, and it refuses to
@@ -35,7 +37,7 @@ while [ $# -gt 0 ]; do
     --port=*) PORT="${1#*=}"; shift ;;
     --bundled-node) NODE_MODE=bundled; shift ;;
     --system-node) NODE_MODE=system; shift ;;
-    -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option: $1 (try --help)" ;;
   esac
 done
@@ -44,7 +46,10 @@ if [ -n "$PORT" ]; then
 fi
 
 # ---------- checks ----------
-[ "$(id -u)" -eq 0 ] || die "run this as root, e.g. sudo ./install.sh"
+if [ "$(id -u)" -ne 0 ]; then
+  command -v sudo >/dev/null || die "run this as root"
+  exec sudo "$(readlink -f "$0")" "$@"
+fi
 command -v systemctl >/dev/null || die "systemd is required (systemctl not found)"
 [ -f "$SRC_DIR/server.js" ] && [ -d "$SRC_DIR/public" ] || die "run this from inside the downloaded tasks folder"
 
@@ -197,6 +202,50 @@ systemctl daemon-reload
 systemctl enable tasks >/dev/null 2>&1
 systemctl restart tasks
 
+# ---------- the `tasks` command ----------
+# A small command for later: `tasks update`, `tasks version`, ... It points back at this folder.
+if [ -e "$CLI_FILE" ] && ! grep -q "$FILE_MARK" "$CLI_FILE"; then
+  say "Skipping the 'tasks' command: $CLI_FILE already exists and wasn't made by this installer"
+  CLI_OK=no
+else
+  cat > "$CLI_FILE" <<EOF
+#!/usr/bin/env bash
+# The Tasks app command. Installed by the Tasks app installer; it runs the scripts in the
+# folder Tasks was installed from. Reinstalling from another folder updates this path.
+SRC="$SRC_DIR"
+EOF
+  cat >> "$CLI_FILE" <<'EOF'
+version() { sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' /opt/tasks/package.json 2>/dev/null | head -1; }
+need_src() {
+  [ -x "$SRC/$1" ] && return
+  echo "Error: the Tasks folder ($SRC) is gone. Download it again with" >&2
+  echo "  git clone https://github.com/pearljamfever/tasks.git && cd tasks && ./install" >&2
+  exit 1
+}
+case "${1:-help}" in
+  update)    need_src update; shift; exec "$SRC/update" "$@" ;;
+  version)   v="$(version)"; echo "Tasks ${v:-is not installed}" ;;
+  status)    exec systemctl status tasks --no-pager ;;
+  logs)      exec journalctl -u tasks -e ;;
+  restart)   exec sudo systemctl restart tasks ;;
+  uninstall) need_src uninstall; shift; exec "$SRC/uninstall" "$@" ;;
+  *) cat <<'HELP'
+Usage: tasks <command>
+
+  update      update Tasks to the newest version (shows what's new first)
+  version     show the installed version
+  status      is it running?
+  logs        show the log, newest at the bottom
+  restart     restart the app (e.g. after changing /etc/tasks.env)
+  uninstall   remove Tasks (keeps your data; add --purge to delete it too)
+HELP
+  ;;
+esac
+EOF
+  chmod 755 "$CLI_FILE"
+  CLI_OK=yes
+fi
+
 # ---------- check ----------
 PORT_NOW="$(sed -n 's/^PORT=\([0-9]*\).*/\1/p' "$ENV_FILE" | tail -1)"
 PORT_NOW="${PORT_NOW:-3100}"
@@ -212,7 +261,7 @@ if [ "$healthy" != yes ]; then
   log="$(journalctl -u tasks -n 30 --no-pager 2>/dev/null || true)"
   if grep -q -e EADDRINUSE -e "already in use" <<<"$log"; then
     systemctl stop tasks || true
-    die "port $PORT_NOW is already in use by another program. Pick another: sudo ./install.sh --port 8080"
+    die "port $PORT_NOW is already in use by another program. Pick another: ./install --port 8080"
   fi
   echo "$log" >&2
   die "the service didn't start; see the log above"
@@ -220,13 +269,18 @@ fi
 
 IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
 echo
-say "Tasks is running."
+VERSION="$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$APP_DIR/package.json" | head -1)"
+say "Tasks $VERSION is running."
 echo "    Open:      http://${IP:-localhost}:$PORT_NOW"
 echo "    Settings:  $ENV_FILE"
 echo "    Data:      $DATA_DIR  (daily backups in backups/)"
 echo "    Logs:      journalctl -u tasks -e"
 if [ "$NODE_MODE" = bundled ]; then
-  echo "    Node.js:   $("$NODE" --version), the app's own copy in $NODE_DIR (re-run the installer to update it)"
+  echo "    Node.js:   $("$NODE" --version), the app's own copy in $NODE_DIR (kept up to date by tasks update)"
 else
   echo "    Node.js:   $("$NODE" --version) from $NODE"
+fi
+if [ "$CLI_OK" = yes ]; then
+  echo
+  echo "    To update later, run:  tasks update      (or ./update in this folder)"
 fi

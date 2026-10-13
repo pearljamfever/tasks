@@ -10,7 +10,7 @@ Type=simple
 User=tasks
 Group=tasks
 WorkingDirectory=/opt/tasks
-# install.sh replaces @NODE@ with the full path to node.
+# ./install replaces @NODE@ with the full path to node.
 ExecStart=@NODE@ /opt/tasks/server.js
 Environment=NODE_ENV=production
 Environment=PORT=3100

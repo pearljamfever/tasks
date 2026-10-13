@@ -30,12 +30,12 @@ Node.js installed with `nvm` lives in a home folder, which the sandboxed service
 ```sh
 git clone https://github.com/pearljamfever/tasks.git
 cd tasks
-sudo ./install.sh
+./install
 ```
 
-Then open the address it prints, e.g. `http://192.168.1.50:3100`.
+It asks for your password if it needs one. Then open the address it prints, e.g. `http://192.168.1.50:3100`.
 
-To use a different port: `sudo ./install.sh --port 8080`.
+To use a different port: `./install --port 8080`.
 
 The installer:
 
@@ -44,21 +44,26 @@ The installer:
 3. Copies the app to `/opt/tasks`.
 4. Writes your settings to `/etc/tasks.env` (only the first time).
 5. Installs and starts the `tasks` systemd service, which starts on boot and restarts itself if it stops.
+6. Adds a `tasks` command for later (see below).
 
 Two options choose where Node.js comes from:
-- `sudo ./install.sh --bundled-node` always uses the app's own copy from nodejs.org, even if the system has one.
-- `sudo ./install.sh --system-node` always uses the system's Node.js, and removes the app's own copy if there was one.
+- `./install --bundled-node` always uses the app's own copy from nodejs.org, even if the system has one.
+- `./install --system-node` always uses the system's Node.js, and removes the app's own copy if there was one.
 
 Your tasks are stored in `/var/lib/tasks`.
 
-Day to day:
+Day to day, the `tasks` command works from any folder:
 
 ```sh
-systemctl status tasks         # is it running?
-sudo systemctl restart tasks   # restart (e.g. after changing settings)
-journalctl -u tasks -e         # logs, newest at the bottom
-curl localhost:3100/healthz         # health check: {"ok":true,"tasks":N}
+tasks update      # update to the newest version (shows what's new first)
+tasks version     # which version is installed
+tasks status      # is it running?
+tasks logs        # the log, newest at the bottom
+tasks restart     # restart (e.g. after changing settings)
+tasks uninstall   # remove it (see Uninstalling)
 ```
+
+`curl localhost:3100/healthz` is a quick health check: it answers `{"ok":true,"tasks":N}`.
 
 ## Settings
 
@@ -73,12 +78,14 @@ Settings live in `/etc/tasks.env`. Restart after changing them: `sudo systemctl 
 ## Upgrading
 
 ```sh
-cd tasks
-git pull
-sudo ./install.sh
+tasks update
 ```
 
-The installer replaces the app files and restarts the service. Your tasks, backups and settings are kept. If the app has its own copy of Node.js, the installer also updates it to the newest LTS release, so re-running it now and then keeps Node.js patched too.
+It shows the version you have and the newest one, lists what's new from the [changelog](CHANGELOG.md), then downloads and installs it. Your tasks, backups and settings are kept. If you're already up to date, it says so and stops. `tasks update --check` only shows the versions, without updating. In the downloaded folder, `./update` does the same.
+
+Updating also brings the app's own copy of Node.js (if it has one) up to the newest LTS release, so it's worth running now and then.
+
+`tasks update` works from the folder you installed from, using `git`. If you edited files in that folder yourself, it stops instead of overwriting them; `tasks update --force` overwrites them.
 
 ## Backups and restoring
 
@@ -103,11 +110,11 @@ This replaces the current data with the backup, so anything added since then is 
 ## Uninstalling
 
 ```sh
-sudo ./uninstall.sh            # removes the app and service; keeps your data and settings
-sudo ./uninstall.sh --purge    # also deletes all tasks, backups, settings and the service user
+tasks uninstall            # removes the app, the service and the tasks command; keeps your data and settings
+tasks uninstall --purge    # also deletes all tasks, backups, settings and the service user
 ```
 
-`--purge` asks you to type `DELETE` to confirm. Reinstalling after a plain uninstall picks your data back up.
+`--purge` asks you to type `DELETE` to confirm. Reinstalling after a plain uninstall picks your data back up. In the downloaded folder, `./uninstall` does the same.
 
 ## Running it without the installer
 
@@ -148,7 +155,7 @@ If you want to reach it from outside your home, use a VPN such as WireGuard or T
 You opened the app under a name it doesn't know. Add the name to `ALLOWED_HOSTS` in `/etc/tasks.env` and restart.
 
 **The installer says the service didn't start.** The installer prints the log. Common causes:
-- **The port is in use.** The installer says so; pick another with `sudo ./install.sh --port 8080`.
+- **The port is in use.** The installer says so; pick another with `./install --port 8080`.
 - **Something else.** The log above the error usually says what went wrong.
 
 **"Couldn't reach nodejs.org to download Node.js."**
@@ -178,7 +185,7 @@ Project layout:
 | `public/` | The web page: `index.html`, `app.css`, `app.js`, the Inter font, and the icons and manifest for browser tabs and home screens |
 | `test/` | Tests, run with Node's built-in test runner |
 | `deploy/tasks.service` | The systemd service the installer sets up |
-| `install.sh`, `uninstall.sh` | Installer and uninstaller |
+| `install`, `update`, `uninstall` | Installer, updater and uninstaller |
 | `docs/` | User guide and screenshots |
 
 There are no dependencies and no build step: edit the files and reload the page (restart the server after changing `server.js`).

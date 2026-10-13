@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Removes the Tasks service and app files.
 #
-#   sudo ./uninstall.sh           # remove the app; keep your data and settings
-#   sudo ./uninstall.sh --purge   # also delete all tasks, backups, settings and the service user
+#   ./uninstall           # remove the app; keep your data and settings  (or: tasks uninstall)
+#   ./uninstall --purge   # also delete all tasks, backups, settings and the service user
 set -euo pipefail
 
 PURGE=no
@@ -12,7 +12,10 @@ case "${1:-}" in
   -h|--help) sed -n '2,5p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
   *) echo "Error: unknown option: $1 (try --help)" >&2; exit 1 ;;
 esac
-[ "$(id -u)" -eq 0 ] || { echo "Error: run this as root, e.g. sudo ./uninstall.sh" >&2; exit 1; }
+if [ "$(id -u)" -ne 0 ]; then
+  command -v sudo >/dev/null || { echo "Error: run this as root" >&2; exit 1; }
+  exec sudo "$(readlink -f "$0")" "$@"
+fi
 
 # "tasks" is a common name: only remove things the Tasks installer marked as its own.
 UNIT_FILE=/etc/systemd/system/tasks.service
@@ -38,6 +41,7 @@ if [ -f /opt/tasks/.installed-by-tasks-app ]; then
   echo "==> Removing /opt/tasks"
   rm -rf /opt/tasks
 fi
+grep -qs "Tasks app" /usr/local/bin/tasks && rm -f /usr/local/bin/tasks
 
 if [ "$PURGE" = yes ]; then
   echo "==> Deleting data, settings and the service user"
@@ -51,5 +55,5 @@ else
   echo "Tasks has been removed. Your data was kept:"
   echo "    Tasks and backups:  /var/lib/tasks"
   echo "    Settings:           /etc/tasks.env"
-  echo "Reinstalling picks them up again. To delete them too, run: sudo ./uninstall.sh --purge"
+  echo "Reinstalling picks them up again. To delete them too, run: ./uninstall --purge"
 fi
