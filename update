@@ -49,16 +49,29 @@ say "Checking GitHub for the newest version"
 g fetch --quiet --tags --force origin || die "couldn't reach GitHub. Check the internet connection and try again."
 REMOTE="origin/$BRANCH"
 LATEST="$(g show "$REMOTE:package.json" | version_in)"
+FOLDER="$(version_in < "$SRC_DIR/package.json")"
 
 echo
 echo "    Installed version:  ${INSTALLED:-not installed}"
 echo "    Newest version:     $LATEST"
-echo
 
-if [ "$(g rev-parse HEAD)" = "$(g rev-parse "$REMOTE")" ] && [ "$INSTALLED" = "$LATEST" ]; then
-  say "You're up to date."
+# GitHub has nothing newer than this folder (the usual "up to date" case, or a folder with
+# changes that aren't on GitHub yet). Never "update" backwards.
+if g merge-base --is-ancestor "$REMOTE" HEAD; then
+  if [ "$(g rev-parse HEAD)" != "$(g rev-parse "$REMOTE")" ]; then
+    echo "    This folder:        $FOLDER (has changes that aren't on GitHub yet)"
+  fi
+  echo
+  if [ "$INSTALLED" = "$FOLDER" ]; then
+    say "You're up to date."
+    exit 0
+  fi
+  [ "$CHECK_ONLY" = yes ] && { say "Run ./update to install $FOLDER from this folder."; exit 0; }
+  say "Installing $FOLDER from this folder"
+  "$SRC_DIR/install"
   exit 0
 fi
+echo
 
 # What's new: the changelog sections above the installed version.
 if [ -n "$INSTALLED" ] && [ "$INSTALLED" != "$LATEST" ]; then
