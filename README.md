@@ -32,4 +32,4 @@ Then open the address it prints. See **[INSTALL.md](INSTALL.md)** for settings, 
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The bundled [Inter](https://rsms.me/inter/) font is licensed separately under the [SIL Open Font License](public/fonts/LICENSE-Inter.txt).
