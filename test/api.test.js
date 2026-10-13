@@ -65,7 +65,7 @@ after(async () => {
 });
 
 test('serves the page, styles, script and font with security headers', async () => {
-  for (const [p, type] of [['/', 'text/html'], ['/app.css', 'text/css'], ['/app.js', 'text/javascript'], ['/fonts/inter-var.woff2', 'font/woff2'], ['/favicon.svg', 'image/svg+xml']]) {
+  for (const [p, type] of [['/', 'text/html'], ['/app.css', 'text/css'], ['/app.js', 'text/javascript'], ['/fonts/inter-var.woff2', 'font/woff2'], ['/favicon.svg', 'image/svg+xml'], ['/apple-touch-icon.png', 'image/png'], ['/icon-512.png', 'image/png'], ['/manifest.webmanifest', 'application/manifest+json']]) {
     const res = await fetch(base + p);
     assert.strictEqual(res.status, 200, p);
     assert.ok(res.headers.get('content-type').startsWith(type), p);

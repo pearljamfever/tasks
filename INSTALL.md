@@ -175,7 +175,7 @@ Project layout:
 | Path | What it is |
 |---|---|
 | `server.js` | The server: API, storage, backups, security checks |
-| `public/` | The web page: `index.html`, `app.css`, `app.js`, the Inter font and the icon |
+| `public/` | The web page: `index.html`, `app.css`, `app.js`, the Inter font, and the icons and manifest for browser tabs and home screens |
 | `test/` | Tests, run with Node's built-in test runner |
 | `deploy/tasks.service` | The systemd service the installer sets up |
 | `install.sh`, `uninstall.sh` | Installer and uninstaller |

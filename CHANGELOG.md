@@ -4,6 +4,11 @@ What changed in each version of Tasks. Versions follow [semantic versioning](htt
 
 To update an install, run `git pull` then `sudo ./install.sh` in the downloaded folder. Your tasks are kept.
 
+## [1.2.0] - 2026-10-13
+
+### Added
+- **Home screen icon.** Adding Tasks to a phone's home screen (Safari's "Add to Home Screen" on iPhone, or "Install app" on Android) now uses the app's logo, and it opens full-screen like an app, without the browser's address bar.
+
 ## [1.1.0] - 2026-10-13
 
 ### Added
@@ -22,5 +27,6 @@ To update an install, run `git pull` then `sudo ./install.sh` in the downloaded 
 
 First release.
 
+[1.2.0]: https://github.com/pearljamfever/tasks/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/pearljamfever/tasks/compare/v1.0...v1.1.0
 [1.0]: https://github.com/pearljamfever/tasks/releases/tag/v1.0
