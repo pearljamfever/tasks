@@ -7,7 +7,7 @@ To update an install, run `git pull` then `sudo ./install.sh` in the downloaded 
 ## [1.2.0] - 2026-10-13
 
 ### Added
-- **Home screen icon.** Adding Tasks to a phone's home screen (Safari's "Add to Home Screen" on iPhone, or "Install app" on Android) now uses the app's logo, and it opens full-screen like an app, without the browser's address bar.
+- **Home screen icon.** Adding Tasks to a phone's home screen now uses the app's logo. On iPhone (Safari's "Add to Home Screen") it also opens full-screen like an app, without the browser's address bar. On Android, Chrome's "Add to Home screen" uses the logo too; a full "Install app" needs the app served over HTTPS.
 
 ## [1.1.0] - 2026-10-13
 
