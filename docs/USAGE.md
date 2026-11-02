@@ -8,6 +8,7 @@ Tasks are cards. Cards in the same category stack together, and clicking a stack
 
 - **New task** (top bar) adds a task. Pick its category from the dropdown, or choose **+ New category…** to make one on the spot.
 - Click a **stack** to spread its cards out. Click **Close**, press **Esc**, or click an empty spot to stack them back up.
+- **Rearrange cards** in a spread-out stack by dragging them. On a phone, press and hold a card first, then drag; a quick swipe still scrolls. The order is saved, and the first card is the one shown on top of the stack. With a keyboard, **Alt + arrow keys** move the selected card.
 - Click a **card** to open the task. From there you can:
   - Rename it by clicking the title.
   - Move it to another category with the dropdown at the top.
@@ -73,7 +74,7 @@ A date with no year that has already passed this year means next year.
 ## Categories
 
 - **Categories** (top bar) is where you add, rename, recolor and delete categories.
-- Click a category's **color square** to pick a new color. Click its **name** to rename it.
+- Click a category's **color square** to pick a new color. The last swatch opens your device's color picker for any color you like. Click its **name** to rename it.
 - A category can only be deleted once it has no tasks (open or completed). Move or delete its tasks first.
 - Names must be unique, ignoring capitalization ("Car" and "car" count as the same).
 

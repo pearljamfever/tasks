@@ -102,6 +102,31 @@ fetch() {
   fi
 }
 
+# The library a Node.js build needs and is missing, if any (e.g. Node 26 needs libatomic).
+missing_libs() { ldd "$1" 2>/dev/null | awk '/not found/ { print $1 }'; }
+
+# Downloads Node.js $NODE_VER into $NODE_STAGE/node and checks it runs. On failure, prints why.
+download_node() {
+  local tarball="node-$NODE_VER-linux-$ARCH.tar.gz" bin="$NODE_STAGE/node/bin/node"
+  fetch "https://nodejs.org/dist/$NODE_VER/$tarball" "$NODE_STAGE/$tarball" || { echo "couldn't download $tarball"; return 1; }
+  fetch "https://nodejs.org/dist/$NODE_VER/SHASUMS256.txt" "$NODE_STAGE/SHASUMS256.txt" || { echo "couldn't download the Node.js checksums"; return 1; }
+  (cd "$NODE_STAGE" && grep " $tarball\$" SHASUMS256.txt | sha256sum -c --quiet - >/dev/null 2>&1) \
+    || { echo "the Node.js download didn't match its published checksum"; return 1; }
+  rm -rf "$NODE_STAGE/node" && mkdir "$NODE_STAGE/node"
+  tar -xzf "$NODE_STAGE/$tarball" -C "$NODE_STAGE/node" --strip-components=1 --no-same-owner || { echo "couldn't unpack $tarball"; return 1; }
+  if ! "$bin" --version >/dev/null 2>&1 && missing_libs "$bin" | grep -q '^libatomic'; then
+    say "Installing libatomic (needed by Node.js $NODE_VER)" >&2
+    if command -v apt-get >/dev/null || command -v zypper >/dev/null; then pkg_install libatomic1 >&2
+    elif command -v pacman >/dev/null; then pkg_install gcc-libs >&2
+    else pkg_install libatomic >&2
+    fi || true
+  fi
+  "$bin" --version >/dev/null 2>&1 && return 0
+  local libs; libs="$(missing_libs "$bin" | tr '\n' ' ')"
+  echo "the downloaded Node.js $NODE_VER doesn't run on this system${libs:+ (missing: $libs)}"
+  return 1
+}
+
 case "$NODE_MODE" in
   system)
     NODE="$(usable_system_node)" || die "--system-node: no system-wide Node.js 18 or newer found (one under /root or /home can't be used)." ;;
@@ -132,20 +157,19 @@ if [ "$NODE_MODE" = bundled ]; then
     say "Couldn't check nodejs.org for a newer Node.js; keeping $CUR_VER"
     NODE_VER="$CUR_VER"
   fi
+  STAGE_DIR="$(mktemp -d)"
+  trap 'rm -rf "$STAGE_DIR"' EXIT
   if [ "$CUR_VER" = "$NODE_VER" ]; then
     say "Using the app's own Node.js $NODE_VER"
   else
     say "Downloading Node.js $NODE_VER (LTS) from nodejs.org"
-    NODE_STAGE="$(mktemp -d)"
-    trap 'rm -rf "$NODE_STAGE"' EXIT
-    tarball="node-$NODE_VER-linux-$ARCH.tar.gz"
-    fetch "https://nodejs.org/dist/$NODE_VER/$tarball" "$NODE_STAGE/$tarball" || die "couldn't download $tarball"
-    fetch "https://nodejs.org/dist/$NODE_VER/SHASUMS256.txt" "$NODE_STAGE/SHASUMS256.txt" || die "couldn't download the Node.js checksums"
-    (cd "$NODE_STAGE" && grep " $tarball\$" SHASUMS256.txt | sha256sum -c --quiet - >/dev/null 2>&1) \
-      || die "the Node.js download didn't match its published checksum; not installing it."
-    mkdir "$NODE_STAGE/node"
-    tar -xzf "$NODE_STAGE/$tarball" -C "$NODE_STAGE/node" --strip-components=1 --no-same-owner
-    "$NODE_STAGE/node/bin/node" --version >/dev/null 2>&1 || die "the downloaded Node.js doesn't run on this system. Install Node.js 18 or newer yourself and re-run."
+    NODE_STAGE="$STAGE_DIR"
+    if ! problem="$(download_node)"; then
+      # A Node.js upgrade must never block an app update: keep the one the app already has.
+      [ -n "$CUR_VER" ] || die "$problem"
+      say "Keeping Node.js $CUR_VER: $problem"
+      NODE_STAGE=""
+    fi
   fi
   NODE="$NODE_DIR/bin/node"
 fi

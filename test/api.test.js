@@ -160,3 +160,43 @@ test('recovers from a damaged data file using the newest backup', async () => {
   assert.ok(cats.some((c) => c.name === 'Keep me'), 'data came back from backup');
   assert.ok(fs.readdirSync(dataDir).some((f) => f.startsWith('data.json.corrupt-')), 'damaged file kept aside');
 });
+
+test('card order: saved per category, new and moved cards go last', async () => {
+  const a = (await call('/api/categories', json('POST', { name: 'Order A' }))).body;
+  const b = (await call('/api/categories', json('POST', { name: 'Order B' }))).body;
+  const mk = async (title, cat) => (await call('/api/tasks', json('POST', { title, categoryId: cat.id }))).body;
+  const t1 = await mk('one', a), t2 = await mk('two', a), t3 = await mk('three', a);
+  assert.deepStrictEqual([t1.position, t2.position, t3.position], [0, 1, 2]);
+
+  const r = await call(`/api/categories/${a.id}/order`, json('PUT', { taskIds: [t3.id, t1.id, t2.id] }));
+  assert.strictEqual(r.status, 200);
+  const pos = async () => Object.fromEntries((await call('/api/tasks')).body.filter((t) => t.categoryId === a.id).map((t) => [t.title, t.position]));
+  assert.deepStrictEqual(await pos(), { three: 0, one: 1, two: 2 });
+
+  // bad requests
+  assert.strictEqual((await call(`/api/categories/${a.id}/order`, json('PUT', { taskIds: [t1.id, t1.id] }))).status, 400, 'duplicates');
+  const other = await mk('elsewhere', b);
+  assert.strictEqual((await call(`/api/categories/${a.id}/order`, json('PUT', { taskIds: [other.id] }))).status, 400, 'task from another category');
+  assert.strictEqual((await call(`/api/categories/${a.id}/order`, { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: '{}' })).status, 415, 'not JSON');
+
+  // moving a card to another category puts it at the end there
+  const moved = (await call(`/api/tasks/${t3.id}`, json('PATCH', { categoryId: b.id }))).body;
+  assert.strictEqual(moved.position, 1);
+  assert.strictEqual((await mk('four', a)).position, 3);
+});
+
+test('gives old tasks without a saved order positions, oldest first', async () => {
+  await stop();
+  const file = path.join(dataDir, 'data.json');
+  const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const cat = data.categories[0];
+  data.tasks.push(
+    { id: 'old2', title: 'old two', categoryId: cat.id, done: false, createdAt: '2020-01-02T00:00:00.000Z', updatedAt: '2020-01-02T00:00:00.000Z', comments: [] },
+    { id: 'old1', title: 'old one', categoryId: cat.id, done: false, createdAt: '2020-01-01T00:00:00.000Z', updatedAt: '2020-01-01T00:00:00.000Z', comments: [] },
+  );
+  fs.writeFileSync(file, JSON.stringify(data));
+  await start();
+  const tasks = (await call('/api/tasks')).body;
+  const p1 = tasks.find((t) => t.id === 'old1').position, p2 = tasks.find((t) => t.id === 'old2').position;
+  assert.ok(typeof p1 === 'number' && p2 === p1 + 1, `old1=${p1} old2=${p2}`);
+});

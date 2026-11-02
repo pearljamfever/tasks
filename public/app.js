@@ -131,10 +131,13 @@ function parseDay(str) {
 const openTasks = () => tasks.filter((t) => !t.done);
 const doneTasks = () => tasks.filter((t) => t.done).sort((a, b) => (b.completedAt || b.updatedAt).localeCompare(a.completedAt || a.updatedAt));
 
+// Cards follow their saved order; any without one (shouldn't happen) go last, oldest first.
+const byPosition = (a, b) => (a.position ?? Infinity) - (b.position ?? Infinity) || a.createdAt.localeCompare(b.createdAt);
+
 function groups() {
   const open = openTasks();
   return sortedCats()
-    .map((c) => ({ cat: c, list: open.filter((t) => t.categoryId === c.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt)) }))
+    .map((c) => ({ cat: c, list: open.filter((t) => t.categoryId === c.id).sort(byPosition) }))
     .filter((g) => g.list.length);
 }
 
@@ -267,9 +270,14 @@ function layout(count) {
 
 function buildSlots(list) {
   const slots = list.map((t) => h('div', {
-    class: 'slot', tabindex: 0, role: 'button', 'aria-label': t.title,
-    onclick: (e) => { e.stopPropagation(); openDetail(t.id); },
-    onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(t.id); } },
+    class: 'slot', tabindex: 0, role: 'button', 'aria-label': t.title, 'data-id': t.id,
+    onclick: (e) => { e.stopPropagation(); if (Date.now() - justDragged > 400) openDetail(t.id); },
+    onpointerdown: (e) => pressCard(e, e.currentTarget),
+    onkeydown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDetail(t.id); }
+      const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+      if (e.altKey && step) { e.preventDefault(); moveCardBy(t.id, step); }
+    },
   }, cardFace(t)));
   slots.push(h('div', {
     class: 'slot', tabindex: 0, role: 'button', 'aria-label': 'Add a task',
@@ -374,8 +382,123 @@ function closeSpread() {
 $('#spreadClose').onclick = closeSpread;
 $('#spreadAdd').onclick = () => openNew(openCat);
 $('#spread').addEventListener('click', (e) => {
+  if (Date.now() - justDragged < 400) return; // the click that ends a drag isn't a click on the background
   if (e.target.id === 'spread' || e.target.id === 'spreadArea') closeSpread();
 });
+
+// ---------- reordering cards in the spread ----------
+// Mouse: press and drag. Touch: hold briefly, then drag (a plain swipe still scrolls).
+// Keyboard: Alt + arrow keys on a focused card. The first card is the one shown on the stack.
+const HOLD_MS = 280;
+let drag = null;     // the card being pressed or dragged
+let justDragged = 0; // when the last drag ended; the click that follows a drag is ignored
+
+const spreadList = () => groups().find((g) => g.cat.id === openCat)?.list || [];
+
+async function saveOrder(catId, order) {
+  order.forEach((t, i) => { t.position = i; });
+  render();
+  try {
+    await api('PUT', `/api/categories/${catId}/order`, { taskIds: order.map((t) => t.id) });
+  } catch {
+    await loadAll().catch(() => {}); // put the board back the way the server has it
+  }
+}
+
+async function moveCardBy(id, step) {
+  const list = spreadList(), from = list.findIndex((t) => t.id === id), to = from + step;
+  if (from < 0 || to < 0 || to >= list.length) return;
+  list.splice(to, 0, list.splice(from, 1)[0]);
+  await saveOrder(openCat, list);
+  $(`#spreadArea .slot[data-id="${id}"]`)?.focus();
+}
+
+function pressCard(e, slot) {
+  if (drag || closing || !$('#spread').classList.contains('open')) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const list = spreadList(), from = list.findIndex((t) => t.id === slot.dataset.id);
+  if (from < 0) return;
+  drag = { slot, list, from, index: from, order: list, pointer: e.pointerId, touch: e.pointerType !== 'mouse',
+           x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, active: false, timer: 0, raf: 0 };
+  if (drag.touch) drag.timer = setTimeout(startDrag, HOLD_MS);
+}
+
+function startDrag() {
+  const d = drag;
+  if (!d || d.active) return;
+  d.active = true;
+  const r = d.slot.getBoundingClientRect();
+  d.grabX = d.x - r.left; d.grabY = d.y - r.top; // where on the card it was picked up
+  d.home = { x: parseFloat(d.slot.style.left), y: parseFloat(d.slot.style.top) };
+  d.slotFor = Object.fromEntries([...$('#spreadArea').children].map((s) => [s.dataset.id, s]));
+  for (const s of Object.values(d.slotFor)) s.style.transition = s === d.slot ? 'none' : 'left .22s ease, top .22s ease';
+  d.slot.classList.add('dragging');
+  navigator.vibrate?.(8);
+  try { d.slot.setPointerCapture(d.pointer); } catch { /* not every browser allows it here */ }
+  followPointer();
+  const edgeScroll = () => { // near the top or bottom edge, scroll the spread
+    const spread = $('#spread'), speed = d.y < 110 ? -12 : d.y > innerHeight - 70 ? 12 : 0;
+    if (speed) { spread.scrollTop += speed; followPointer(); }
+    d.raf = requestAnimationFrame(edgeScroll);
+  };
+  d.raf = requestAnimationFrame(edgeScroll);
+}
+
+// Moves the dragged card under the pointer; the nearest card position becomes the drop target.
+function followPointer() {
+  const d = drag, a = $('#spreadArea').getBoundingClientRect();
+  const x = d.x - a.left - d.grabX, y = d.y - a.top - d.grabY;
+  d.slot.style.transform = `translate(${x - d.home.x}px, ${y - d.home.y}px) scale(1.04)`;
+  const pos = layout(d.list.length + 1);
+  let best = d.index, bestDist = Infinity;
+  for (let i = 0; i < d.list.length; i++) {
+    const dist = Math.hypot(pos[i].x - x, pos[i].y - y);
+    if (dist < bestDist) { best = i; bestDist = dist; }
+  }
+  if (best !== d.index) { d.index = best; arrange(d, pos); }
+}
+
+// Slides the other cards into the order the drop would give.
+function arrange(d, pos) {
+  d.order = d.list.filter((_, i) => i !== d.from);
+  d.order.splice(d.index, 0, d.list[d.from]);
+  d.order.forEach((t, i) => {
+    const s = d.slotFor[t.id];
+    if (s !== d.slot) { s.style.left = pos[i].x + 'px'; s.style.top = pos[i].y + 'px'; }
+  });
+}
+
+function endDrag(cancelled) {
+  const d = drag;
+  drag = null;
+  clearTimeout(d.timer);
+  cancelAnimationFrame(d.raf);
+  if (!d.active) return; // a tap or a scroll, not a drag
+  justDragged = Date.now();
+  const pos = layout(d.list.length + 1);
+  if (cancelled) { d.index = d.from; arrange(d, pos); }
+  const at = pos[d.order.indexOf(d.list[d.from])];
+  d.slot.classList.remove('dragging');
+  d.slot.style.transition = 'left .22s ease, top .22s ease, transform .22s ease';
+  d.slot.style.left = at.x + 'px'; d.slot.style.top = at.y + 'px'; d.slot.style.transform = '';
+  setTimeout(() => {
+    if (d.order.some((t, i) => t !== d.list[i])) saveOrder(openCat, d.order); else renderSpread();
+  }, 230);
+}
+
+window.addEventListener('pointermove', (e) => {
+  const d = drag;
+  if (!d || e.pointerId !== d.pointer) return;
+  d.x = e.clientX; d.y = e.clientY;
+  if (d.active) return followPointer();
+  const moved = Math.hypot(d.x - d.x0, d.y - d.y0);
+  if (d.touch && moved > 10) { clearTimeout(d.timer); drag = null; } // moved before the hold: it's a scroll
+  else if (!d.touch && moved > 5) startDrag();
+});
+window.addEventListener('pointerup', (e) => { if (drag && e.pointerId === drag.pointer) endDrag(false); });
+window.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.pointer) endDrag(true); });
+// While a card is being dragged by touch, the page mustn't scroll instead.
+document.addEventListener('touchmove', (e) => { if (drag?.active) e.preventDefault(); }, { passive: false });
 
 // ---------- task detail ----------
 function openDetail(id) {
@@ -732,18 +855,34 @@ function renderCats() {
               render(); renderCats();
             },
           }, icon('trash')),
-          paletteFor === c.id ? h('div', { class: 'palette' }, PALETTE.map((col) => h('button', {
-            style: { '--c': col }, 'aria-label': `Color ${col}`, 'aria-pressed': String(col === c.color),
-            onclick: async () => {
-              Object.assign(c, await api('PATCH', `/api/categories/${c.id}`, { color: col }));
-              paletteFor = null; render(); renderCats();
-            },
-          }, col === c.color ? icon('check') : null))) : null,
+          paletteFor === c.id ? h('div', { class: 'palette' },
+            PALETTE.map((col) => h('button', {
+              style: { '--c': col }, 'aria-label': `Color ${col}`, 'aria-pressed': String(col === c.color),
+              onclick: () => setCatColor(c, col),
+            }, col === c.color ? icon('check') : null)),
+            customSwatch(c),
+          ) : null,
         );
       })),
       h('div', { class: 'add-cat' }, addInput, h('button', { class: 'pbtn primary', onclick: add }, icon('plus'), 'Add')),
     ),
   );
+}
+
+async function setCatColor(c, color) {
+  Object.assign(c, await api('PATCH', `/api/categories/${c.id}`, { color }));
+  paletteFor = null; render(); renderCats();
+}
+
+// The last swatch opens the device's color picker. It shows a rainbow, or the category's own
+// color (ticked) once a custom one is chosen.
+function customSwatch(c) {
+  const custom = !PALETTE.includes(c.color);
+  const input = h('input', { type: 'color', value: c.color, 'aria-label': `Custom color for ${c.name}` });
+  input.addEventListener('input', () => input.closest('.cat-row')?.style.setProperty('--cat', input.value)); // live preview
+  input.addEventListener('change', () => setCatColor(c, input.value));
+  return h('label', { class: `custom-swatch${custom ? ' on' : ''}`, title: 'Custom color', style: { '--c': c.color } },
+    icon(custom ? 'check' : 'plus'), input);
 }
 
 // ---------- new task ----------

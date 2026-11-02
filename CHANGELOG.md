@@ -4,6 +4,16 @@ What changed in each version of Tasks. Versions follow [semantic versioning](htt
 
 To update an install, run `tasks update`. Your tasks are kept. (Installs from before 1.3.0 don't have that command yet: in the downloaded folder, run `git pull` and then `sudo ./install.sh` once.)
 
+## [1.5.0] - 2026-11-02
+
+### Added
+- **Rearrange cards.** In an opened stack, drag a card to a new spot: on a phone, press and hold it first; on a computer, just drag. The order is saved, and the first card is the one shown on top of the stack. With a keyboard, Alt + arrow keys move the selected card.
+- **Custom category colors.** In Categories, the last color swatch opens your device's color picker, so a category can be any color.
+
+### Fixed
+- The installer no longer stops when a newer Node.js can't run: it keeps the Node.js the app already has and installs the update anyway.
+- The installer installs `libatomic` when a newer Node.js needs it (Node.js 26 does), instead of failing.
+
 ## [1.4.0] - 2026-10-13
 
 ### Added
@@ -45,6 +55,7 @@ To update an install, run `tasks update`. Your tasks are kept. (Installs from be
 
 First release.
 
+[1.5.0]: https://github.com/pearljamfever/tasks/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/pearljamfever/tasks/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/pearljamfever/tasks/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/pearljamfever/tasks/compare/v1.1.0...v1.2.0

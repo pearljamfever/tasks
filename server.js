@@ -145,8 +145,17 @@ function load() {
       if (t.done && !t.completedAt) t.completedAt = t.updatedAt;
     }
   }
+  // Tasks from before cards could be reordered get positions in their old order (oldest first).
+  const unplaced = data.tasks.filter((t) => typeof t.position !== 'number').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  for (const t of unplaced) t.position = endPosition(data.tasks, t.categoryId);
   save(data);
   return data;
+}
+
+// One past the last card in a category, so new or moved cards go to the end.
+function endPosition(taskList, categoryId) {
+  const used = taskList.filter((t) => t.categoryId === categoryId && typeof t.position === 'number').map((t) => t.position);
+  return used.length ? Math.max(...used) + 1 : 0;
 }
 
 let db = load();
@@ -235,9 +244,26 @@ const KINDS = ['note', 'task', 'remind', 'waiting'];
 const validDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(new Date(d + 'T00:00:00'));
 const validColor = (c) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
 
-async function categoriesApi(req, res, catId) {
+async function categoriesApi(req, res, catId, sub) {
   const cat = catId && db.categories.find((c) => c.id === catId);
   if (catId && !cat) return send(res, 404, { error: 'Category not found' });
+
+  // Saves the order of a category's cards: { taskIds: [...] }, first card first.
+  if (catId && sub === 'order' && req.method === 'PUT') {
+    const b = await readBody(req);
+    const ids = Array.isArray(b.taskIds) ? b.taskIds : null;
+    if (!ids || new Set(ids).size !== ids.length) return send(res, 400, { error: 'Send the list of task ids' });
+    const list = ids.map((tid) => db.tasks.find((t) => t.id === tid));
+    if (list.some((t) => !t || t.categoryId !== cat.id)) return send(res, 400, { error: 'Those tasks aren\'t all in this category' });
+    list.forEach((t, i) => { t.position = i; });
+    // Cards that weren't listed (e.g. completed ones) keep their order, after the listed ones.
+    db.tasks.filter((t) => t.categoryId === cat.id && !ids.includes(t.id))
+      .sort((a, b) => a.position - b.position)
+      .forEach((t, i) => { t.position = ids.length + i; });
+    save(db);
+    return send(res, 200, db.tasks.filter((t) => t.categoryId === cat.id).map(({ id: tid, position }) => ({ id: tid, position })));
+  }
+  if (sub) return send(res, 404, { error: 'Not found' });
 
   if (!catId && req.method === 'GET') return send(res, 200, db.categories);
 
@@ -294,7 +320,7 @@ async function tasksApi(req, res, parts) {
     if (!title) return send(res, 400, { error: 'Title is required' });
     if (!catExists(b.categoryId)) return send(res, 400, { error: 'Pick a category' });
     const t = {
-      id: id(), title, categoryId: b.categoryId,
+      id: id(), title, categoryId: b.categoryId, position: endPosition(db.tasks, b.categoryId),
       done: false, createdAt: now(), updatedAt: now(), completedAt: null, comments: [],
     };
     db.tasks.push(t);
@@ -311,7 +337,10 @@ async function tasksApi(req, res, parts) {
     }
     if (b.categoryId !== undefined) {
       if (!catExists(b.categoryId)) return send(res, 400, { error: 'Unknown category' });
-      task.categoryId = b.categoryId;
+      if (b.categoryId !== task.categoryId) {
+        task.categoryId = b.categoryId;
+        task.position = endPosition(db.tasks.filter((t) => t !== task), b.categoryId);
+      }
     }
     if (b.done !== undefined && !!b.done !== task.done) {
       task.done = !!b.done;
@@ -387,7 +416,7 @@ const server = http.createServer(async (req, res) => {
     if (parts[0] === 'api') {
       if (!read) checkWrite(req);
       if (parts[1] === 'tasks') return await tasksApi(req, res, parts.slice(2));
-      if (parts[1] === 'categories') return await categoriesApi(req, res, parts[2]);
+      if (parts[1] === 'categories') return await categoriesApi(req, res, parts[2], parts[3]);
       return send(res, 404, { error: 'Not found' });
     }
     if (read) return serveStatic(req, res, url.pathname);

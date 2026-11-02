@@ -422,3 +422,18 @@
   .ptr.ready { color: var(--primary); }
   .ptr.spinning .ico { animation: ptr-spin .8s linear infinite; }
   @keyframes ptr-spin { to { transform: rotate(360deg); } }
+
+  /* Dragging cards to reorder them in the spread. */
+  .slot { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  .slot.dragging { z-index: 1000 !important; cursor: grabbing; }
+  .slot.dragging .card { box-shadow: 0 2px 6px rgba(0,0,0,.12), 0 28px 50px -10px rgba(0,0,0,.4); transform: rotate(-2deg); }
+
+  /* The custom color swatch: a rainbow until a custom color is picked. */
+  .custom-swatch {
+    position: relative; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; flex: none;
+    display: grid; place-items: center; color: #fff;
+    background: conic-gradient(#ef4444, #f59e0b, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ec4899, #ef4444);
+  }
+  .custom-swatch .ico { filter: drop-shadow(0 1px 1px rgba(0,0,0,.45)); }
+  .custom-swatch.on { background: var(--c); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--c); }
+  .custom-swatch input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
